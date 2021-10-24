@@ -11,6 +11,8 @@ services:
     env_file: docker.env
     environment:
       ROLE: leader
+    volumes:
+      - ./:/python
   follower_1:
     entrypoint: ["flask", "run"]
     build:
@@ -22,6 +24,8 @@ services:
     env_file: docker.env
     environment:
       ROLE: follower
+    volumes:
+      - ./:/python
   follower_2:
     entrypoint: ["flask", "run"]
     build:
@@ -33,4 +37,5 @@ services:
     env_file: docker.env
     environment:
       ROLE: follower
-      DELAY: 200
+    volumes:
+      - ./:/python
