@@ -1,0 +1,29 @@
+version: '3'
+services:
+  leader:
+    entrypoint: ["flask", "run"]
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    image: flask
+    ports:
+      - 8080:5000
+    env_file: docker.env
+  follower_1:
+    entrypoint: ["flask", "run"]
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    image: flask
+    ports:
+      - 8081:5000
+    env_file: docker.env
+  follower_2:
+    entrypoint: ["flask", "run"]
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    image: flask
+    ports:
+      - 8082:5000
+    env_file: docker.env
