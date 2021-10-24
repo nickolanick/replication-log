@@ -3,3 +3,4 @@ venv/
 
 # Python stuff
 __pycache__/**
+app
