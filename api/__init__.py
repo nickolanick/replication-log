@@ -18,7 +18,7 @@ class AppDB():
     def write_message(self, message):
         self.message = message
         time.sleep(self.delay)
-        self.threads = [threading.Thread(target=self.write_secondaries, args=(follower,)) for follower in self.followers ]
+        self.threads = [threading.Thread(target=self.write_secondaries, args=(follower,)) for follower in self.followers]
         if self.role == "leader":
             for thread in self.threads:
                 thread.start()

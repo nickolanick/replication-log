@@ -1,10 +1,15 @@
-FROM python:3
+FROM golang:1.17-alpine
 
-WORKDIR /python
-COPY requirements.txt requirements.txt 
+WORKDIR /app
 
-RUN pip3 install -r requirements.txt
+COPY go.mod ./
+COPY go.sum ./
+RUN go mod download
 
-COPY . /python
+COPY *.go ./
 
-ENTRYPOINT python3 main.py
+RUN go build -o /docker-gs-ping
+
+EXPOSE 8080
+
+CMD [ "/docker-gs-ping" ]
