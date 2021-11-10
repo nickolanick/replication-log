@@ -1,7 +1,7 @@
 package main
 
 import (
-  "os"
+	"os"
 )
 
 func getEnv(key, defaultValue string) string {

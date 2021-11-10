@@ -1,27 +1,56 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
-	"strings"
 	"strconv"
+	"strings"
+	"time"
 )
+
+type Message struct {
+	Message string `json:"message"`
+}
 
 func read_messages(w http.ResponseWriter, req *http.Request) {
 	appDb := getAppDb()
-	fmt.Fprintf(w, "read message\n")
+	fmt.Fprintf(w, "read message %s\n", appDb.messages)
 }
 
 func write_message(w http.ResponseWriter, req *http.Request) {
-	fmt.Fprintf(w, "write message\n")
+	appDb := getAppDb()
+	// if role is leader we send to channel commit all
+	// otherwise we proxy to leader
+	fmt.Fprintf(w, "write message %s\n", appDb.followers)
+}
+
+func commit_message(w http.ResponseWriter, req *http.Request) {
+	appDb := getAppDb()
+	time.Sleep(time.Duration(appDb.delay) * time.Second)
+
+	var m Message
+	if req.Body == nil {
+		http.Error(w, "Please send a request body", 400)
+		return
+	}
+	err := json.NewDecoder(req.Body).Decode(&m)
+	if err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "message: %+v", m)
+	appDb.write_message(m.Message)
+	return
 }
 
 func main() {
 
 	httpPort := getEnv("HTTP_PORT", "8080")
 	role := getEnv("ROLE", "follower")
-	delay, _ := strconv.Atoi(getEnv("DELAY", "10"))
+	delay, _ := strconv.Atoi(getEnv("DELAY", "0"))
 	followers := strings.Split(os.Getenv("FOLLOWERS"), ",")
 
 	fmt.Printf("%s", role)
@@ -30,7 +59,9 @@ func main() {
 		panic("provide follower list")
 	}
 
-	fmt.Printf("%+v\n", getAppDb(role, followers, delay))
+	fmt.Printf("%+v\n", initAppDb(role, followers, delay))
+
+	http.HandleFunc("/commit", commit_message)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		switch req.Method {
