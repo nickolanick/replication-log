@@ -12,6 +12,7 @@ import (
 
 type Message struct {
 	Message string `json:"message"`
+	WriteConsistency int64 `json:"write_consistency"`
 }
 
 func read_messages(w http.ResponseWriter, req *http.Request) {
@@ -21,9 +22,34 @@ func read_messages(w http.ResponseWriter, req *http.Request) {
 
 func write_message(w http.ResponseWriter, req *http.Request) {
 	appDb := getAppDb()
+
+	var m Message
+	if req.Body == nil {
+		http.Error(w, "Please send a request body", 400)
+		return
+	}
+	err := json.NewDecoder(req.Body).Decode(&m)
+	if err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
 	// if role is leader we send to channel commit all
 	// otherwise we proxy to leader
-	fmt.Fprintf(w, "write message %s\n", appDb.followers)
+	// send commitMessage
+	// wc should be from field, default field == follower number
+	if (m.WriteConsistency == 0) {
+		m.WriteConsistency = int64(len(appDb.followers))
+	}
+	wcmsg := WriteConsistencyMessage{m.Message, m.WriteConsistency}
+	appDb.commitMessages(&wcmsg)
+	// while wcmsg atomic counter >= 0 wait
+	for {
+		if (wcmsg.wc_counter <= 0) {
+			break
+		}
+	}
+
+	fmt.Fprintf(w, "write message %s write consist %s\n", appDb.followers, m.WriteConsistency)
 }
 
 func commit_message(w http.ResponseWriter, req *http.Request) {

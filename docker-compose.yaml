@@ -20,6 +20,7 @@ services:
     env_file: docker.env
     environment:
       ROLE: follower
+      DELAY: 3
   follower_2:
     build:
       context: .

@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
+	"sync/atomic"
 )
 
 // add worker pool
@@ -11,10 +14,9 @@ type AppDb struct {
 	role      string
 	followers []string
 	delay     int
+	worker_queue []chan *WriteConsistencyMessage
 	//should be hashmap and ordered array
 	messages []string
-	// we use this to handle termination -> no idea what we actually handle but let it be
-	wg sync.WaitGroup
 }
 
 // TODO: add lock/unlock
@@ -33,21 +35,62 @@ func (app AppDb) read_messages() []string {
 var appDb *AppDb
 var lock = &sync.Mutex{}
 
-func commitMessage(messages chan string, wg *sync.WaitGroup, follower string) {
-	defer wg.Done()
+type WriteConsistencyMessage struct {
+	message string
+	// write consistency
+	wc_counter int64
+}
 
-	for message := range messages {
-		// send request to follower here
+func (wcmsg *WriteConsistencyMessage) decrease() {
+	atomic.AddInt64(&wcmsg.wc_counter, -1)
+}
+
+func (appDb *AppDb) commitMessages(wcmsg *WriteConsistencyMessage) {
+	// for chan in chans send message
+  for _, queue := range appDb.worker_queue {
+		queue <- wcmsg
+	}
+}
+
+// TODO: consider waitgroup
+func commitMessage(messages <-chan *WriteConsistencyMessage, follower string) {
+
+	for wcmessage := range messages {
+		// send request to commit
+		postBody, _ := json.Marshal(map[string]string{
+			"message": wcmessage.message,
+		})
+
+		for {
+			responseBody := bytes.NewBuffer(postBody)
+			//Leverage Go's HTTP Post function to make request
+			_, err := http.Post(follower+"/commit", "application/json", responseBody)
+			// TODO: read response body status and retry
+			if err == nil {
+				break
+			}
+		}
+
+		wcmessage.decrease()
 	}
 }
 
 func initAppDb(role string, followers []string, delay int) *AppDb {
 	lock.Lock()
 	defer lock.Unlock()
+
 	if appDb == nil {
 		fmt.Println("Creating single instance now.")
-		appDb = &AppDb{role, followers, delay, []string{}}
+		appDb = &AppDb{role, followers, delay, []chan *WriteConsistencyMessage{}, []string{}}
 	}
+	// initialize buff chan
+	// TODO: add to configuration length of queue
+  for _, follower := range appDb.followers {
+		queue := make(chan *WriteConsistencyMessage , 200)
+		go commitMessage(queue, follower)
+		appDb.worker_queue = append(appDb.worker_queue, queue)
+  }
+
 	return appDb
 }
 
