@@ -11,9 +11,9 @@ import (
 
 // add worker pool
 type AppDb struct {
-	role      string
-	followers []string
-	delay     int
+	role         string
+	followers    []string
+	delay        int
 	worker_queue []chan *WriteConsistencyMessage
 	//should be hashmap and ordered array
 	messages []string
@@ -21,7 +21,6 @@ type AppDb struct {
 
 // TODO: add lock/unlock
 func (app *AppDb) write_message(m string) {
-	// for followers send shit
 	if app.role == "leaders" {
 		fmt.Printf("appending to secondaries")
 	}
@@ -47,7 +46,7 @@ func (wcmsg *WriteConsistencyMessage) decrease() {
 
 func (appDb *AppDb) commitMessages(wcmsg *WriteConsistencyMessage) {
 	// for chan in chans send message
-  for _, queue := range appDb.worker_queue {
+	for _, queue := range appDb.worker_queue {
 		queue <- wcmsg
 	}
 }
@@ -85,11 +84,11 @@ func initAppDb(role string, followers []string, delay int) *AppDb {
 	}
 	// initialize buff chan
 	// TODO: add to configuration length of queue
-  for _, follower := range appDb.followers {
-		queue := make(chan *WriteConsistencyMessage , 200)
+	for _, follower := range appDb.followers {
+		queue := make(chan *WriteConsistencyMessage, 200)
 		go commitMessage(queue, follower)
 		appDb.worker_queue = append(appDb.worker_queue, queue)
-  }
+	}
 
 	return appDb
 }

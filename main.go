@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,8 +12,8 @@ import (
 )
 
 type Message struct {
-	Message string `json:"message"`
-	WriteConsistency int64 `json:"write_consistency"`
+	Message          string `json:"message"`
+	WriteConsistency int64  `json:"write_consistency"`
 }
 
 func read_messages(w http.ResponseWriter, req *http.Request) {
@@ -33,23 +34,36 @@ func write_message(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, err.Error(), 400)
 		return
 	}
-	// if role is leader we send to channel commit all
-	// otherwise we proxy to leader
-	// send commitMessage
-	// wc should be from field, default field == follower number
-	if (m.WriteConsistency == 0) {
+	if m.WriteConsistency == 0 {
 		m.WriteConsistency = int64(len(appDb.followers))
 	}
-	wcmsg := WriteConsistencyMessage{m.Message, m.WriteConsistency}
-	appDb.commitMessages(&wcmsg)
-	// while wcmsg atomic counter >= 0 wait
-	for {
-		if (wcmsg.wc_counter <= 0) {
-			break
+
+	if appDb.role == "follower" {
+		postBody, _ := json.Marshal(map[interface{}]interface{}{
+			"message": m.Message, "write_consistency": m.WriteConsistency,
+		})
+		responseBody := bytes.NewBuffer(postBody)
+		_, err := http.Post("http://leader:5000", "application/json", responseBody)
+
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
 		}
+
+		fmt.Fprintf(w, "Follower write %s  role is %s %s \n", m.Message, appDb.role, appDb.followers)
+
+	} else {
+		wcmsg := WriteConsistencyMessage{m.Message, m.WriteConsistency}
+		appDb.commitMessages(&wcmsg)
+
+		for {
+			if wcmsg.wc_counter <= 0 {
+				break
+			}
+		}
+		fmt.Fprintf(w, "write message %s write consist %s\n", appDb.followers, m.WriteConsistency)
 	}
 
-	fmt.Fprintf(w, "write message %s write consist %s\n", appDb.followers, m.WriteConsistency)
 }
 
 func commit_message(w http.ResponseWriter, req *http.Request) {
