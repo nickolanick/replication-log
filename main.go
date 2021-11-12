@@ -23,8 +23,8 @@ func read_messages(w http.ResponseWriter, req *http.Request) {
 
 func write_message(w http.ResponseWriter, req *http.Request) {
 	appDb := getAppDb()
-
 	var m Message
+
 	if req.Body == nil {
 		http.Error(w, "Please send a request body", 400)
 		return
@@ -37,20 +37,15 @@ func write_message(w http.ResponseWriter, req *http.Request) {
 	if m.WriteConsistency == 0 {
 		m.WriteConsistency = int64(len(appDb.followers))
 	}
-
 	if appDb.role == "follower" {
-		postBody, _ := json.Marshal(map[interface{}]interface{}{
-			"message": m.Message, "write_consistency": m.WriteConsistency,
-		})
-		responseBody := bytes.NewBuffer(postBody)
-		_, err := http.Post("http://leader:5000", "application/json", responseBody)
-
+		payloadBuf := new(bytes.Buffer)
+		json.NewEncoder(payloadBuf).Encode(m)
+		resp, err := http.Post("http://leader:5000", "application/json", payloadBuf)
+		defer resp.Body.Close()
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 			return
 		}
-
-		fmt.Fprintf(w, "Follower write %s  role is %s %s \n", m.Message, appDb.role, appDb.followers)
 
 	} else {
 		wcmsg := WriteConsistencyMessage{m.Message, m.WriteConsistency}
@@ -61,9 +56,8 @@ func write_message(w http.ResponseWriter, req *http.Request) {
 				break
 			}
 		}
-		fmt.Fprintf(w, "write message %s write consist %s\n", appDb.followers, m.WriteConsistency)
 	}
-
+	fmt.Fprintf(w, "write message %s write consist %s\n", appDb.followers, m.WriteConsistency)
 }
 
 func commit_message(w http.ResponseWriter, req *http.Request) {
