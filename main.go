@@ -9,74 +9,78 @@ import (
 	"strconv"
 	"strings"
 	"time"
+  "sync"
 )
-
-type Message struct {
-	Message          string `json:"message"`
-	WriteConsistency int64  `json:"write_consistency"`
-}
 
 func read_messages(w http.ResponseWriter, req *http.Request) {
 	appDb := getAppDb()
-	fmt.Fprintf(w, "read message %s\n", appDb.messages)
+	fmt.Fprintf(w, "%s\n", appDb.messages)
 }
 
 func write_message(w http.ResponseWriter, req *http.Request) {
 	appDb := getAppDb()
-	var m Message
+	var wr_cons_msg WriteConsistencyMessage
 
 	if req.Body == nil {
 		http.Error(w, "Please send a request body", 400)
 		return
 	}
-	err := json.NewDecoder(req.Body).Decode(&m)
+	err := json.NewDecoder(req.Body).Decode(&wr_cons_msg)
 	if err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
-	if m.WriteConsistency == 0 {
-		m.WriteConsistency = int64(len(appDb.followers))
-	}
+
 	if appDb.role == "follower" {
 		payloadBuf := new(bytes.Buffer)
-		json.NewEncoder(payloadBuf).Encode(m)
+		json.NewEncoder(payloadBuf).Encode(wr_cons_msg)
 		resp, err := http.Post("http://leader:5000", "application/json", payloadBuf)
 		defer resp.Body.Close()
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 			return
 		}
-
 	} else {
-		wcmsg := WriteConsistencyMessage{m.Message, m.WriteConsistency}
-		appDb.commitMessages(&wcmsg)
+		// if role is leader we send to channel commit all
+		// otherwise we proxy to leader
+		// send commitMessage
+		// wc should be from field, default field == follower number
+		// while wcmsg atomic counter >= 0 wait
 
-		for {
-			if wcmsg.wc_counter <= 0 {
-				break
-			}
+		if wr_cons_msg.WriteConsistency == 0 {
+			wr_cons_msg.WriteConsistency = len(appDb.followers)
 		}
+
+    var write_cond sync.WaitGroup
+    write_cond.Add(wr_cons_msg.WriteConsistency)
+
+    wr_cons_msg.WriteCond = &write_cond
+
+		appDb.commitMessages(&wr_cons_msg)
+
+    write_cond.Wait()
 	}
-	fmt.Fprintf(w, "write message %s write consist %s\n", appDb.followers, m.WriteConsistency)
+
+	fmt.Fprintf(w, "write message %s write consist %i\n", appDb.followers, wr_cons_msg.WriteConsistency)
 }
 
 func commit_message(w http.ResponseWriter, req *http.Request) {
 	appDb := getAppDb()
 	time.Sleep(time.Duration(appDb.delay) * time.Second)
 
-	var m Message
+	var wr_cons_msg WriteConsistencyMessage
 	if req.Body == nil {
 		http.Error(w, "Please send a request body", 400)
 		return
 	}
-	err := json.NewDecoder(req.Body).Decode(&m)
+	err := json.NewDecoder(req.Body).Decode(&wr_cons_msg)
 	if err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "message: %+v", m)
-	appDb.write_message(m.Message)
+	fmt.Fprintf(w, "message: %+v", wr_cons_msg)
+	appDb.write_message(wr_cons_msg.Message)
 	return
 }
 

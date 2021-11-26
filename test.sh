@@ -6,8 +6,12 @@ curl -X POST http://127.0.0.1:8081/ \
 
 curl -X POST http://127.0.0.1:8080/ \
    -H 'Content-Type: application/json' \
-   -d '{"message":"another_great_message","write_consistency":2}'
+   -d '{"message":"my_great_message", "write_consistency": 1}'
+
+curl -X POST http://127.0.0.1:8080/ \
+   -H 'Content-Type: application/json' \
+   -d '{"message":"another_great_message", "write_consistency": 3}'
 
 curl -X GET http://127.0.0.1:8081/
 
-# ./vegeta attack -targets=vegeta -duration=10s | tee results.bin | vegeta plot
+#./vegeta attack -targets=vegeta.txt -duration=10s | tee results.bin | vegeta plot

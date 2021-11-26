@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
-	"sync/atomic"
 )
 
 // add worker pool
@@ -34,16 +33,6 @@ func (app AppDb) read_messages() []string {
 var appDb *AppDb
 var lock = &sync.Mutex{}
 
-type WriteConsistencyMessage struct {
-	message string
-	// write consistency
-	wc_counter int64
-}
-
-func (wcmsg *WriteConsistencyMessage) decrease() {
-	atomic.AddInt64(&wcmsg.wc_counter, -1)
-}
-
 func (appDb *AppDb) commitMessages(wcmsg *WriteConsistencyMessage) {
 	// for chan in chans send message
 	for _, queue := range appDb.worker_queue {
@@ -57,7 +46,7 @@ func commitMessage(messages <-chan *WriteConsistencyMessage, follower string) {
 	for wcmessage := range messages {
 		// send request to commit
 		postBody, _ := json.Marshal(map[string]string{
-			"message": wcmessage.message,
+			"message": wcmessage.Message,
 		})
 
 		for {
@@ -70,7 +59,12 @@ func commitMessage(messages <-chan *WriteConsistencyMessage, follower string) {
 			}
 		}
 
-		wcmessage.decrease()
+    // negative wait group throws panic
+    // we can catch it inside another function scope
+    func (cond *sync.WaitGroup) {
+        defer recover()
+        cond.Done()
+    }(wcmessage.WriteCond)
 	}
 }
 
@@ -85,7 +79,7 @@ func initAppDb(role string, followers []string, delay int) *AppDb {
 	// initialize buff chan
 	// TODO: add to configuration length of queue
 	for _, follower := range appDb.followers {
-		queue := make(chan *WriteConsistencyMessage, 200)
+		queue := make(chan *WriteConsistencyMessage, 200000)
 		go commitMessage(queue, follower)
 		appDb.worker_queue = append(appDb.worker_queue, queue)
 	}
