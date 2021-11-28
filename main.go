@@ -5,21 +5,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
-	"strconv"
-	"strings"
+	//	"os"
+	//	"strconv"
+	//	"strings"
+	"sync"
 	"time"
-  "sync"
 )
 
 func read_messages(w http.ResponseWriter, req *http.Request) {
-	//appDb := getAppDb()
-  fmt.Fprintf(w, "%s\n", repository.GetMessages())
-  //fmt.Fprintf(w, "%s\n", appDb.messages)
+	fmt.Fprintf(w, "%s\n", repository.GetMessages())
 }
 
 func write_message(w http.ResponseWriter, req *http.Request) {
-	appDb := getAppDb()
 	var wr_cons_msg WriteConsistencyMessage
 
 	if req.Body == nil {
@@ -32,7 +29,7 @@ func write_message(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if appDb.role == "follower" {
+	if config.role == "follower" {
 		payloadBuf := new(bytes.Buffer)
 		json.NewEncoder(payloadBuf).Encode(wr_cons_msg)
 		resp, err := http.Post("http://leader:5000", "application/json", payloadBuf)
@@ -49,25 +46,25 @@ func write_message(w http.ResponseWriter, req *http.Request) {
 		// while wcmsg atomic counter >= 0 wait
 
 		if wr_cons_msg.WriteConsistency == 0 {
-			wr_cons_msg.WriteConsistency = len(appDb.followers)
+			wr_cons_msg.WriteConsistency = len(config.nodes)
 		}
 
-    var write_cond sync.WaitGroup
-    write_cond.Add(wr_cons_msg.WriteConsistency)
+		var write_cond sync.WaitGroup
+		write_cond.Add(wr_cons_msg.WriteConsistency)
 
-    wr_cons_msg.WriteCond = &write_cond
+		wr_cons_msg.WriteCond = &write_cond
+		// wr_cons_msg.WriteCond.Add(wr_cons_msg.WriteConsistency)
 
-		appDb.commitMessages(&wr_cons_msg)
+		cluster.commitMessages(&wr_cons_msg)
 
-    write_cond.Wait()
+		write_cond.Wait()
 	}
 
-	fmt.Fprintf(w, "write message %s write consist %i\n", appDb.followers, wr_cons_msg.WriteConsistency)
+	fmt.Fprintf(w, "write consistency %i\n", wr_cons_msg.WriteConsistency)
 }
 
 func commit_message(w http.ResponseWriter, req *http.Request) {
-	appDb := getAppDb()
-	time.Sleep(time.Duration(appDb.delay) * time.Second)
+	time.Sleep(time.Duration(config.delay) * time.Second)
 
 	var wr_cons_msg WriteConsistencyMessage
 	if req.Body == nil {
@@ -79,27 +76,21 @@ func commit_message(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, err.Error(), 400)
 		return
 	}
+
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "message: %+v", wr_cons_msg)
+
 	repository.AppendMessage(wr_cons_msg.Message)
 	return
 }
 
 func main() {
 
-  // move this to read_config
-	httpPort := getEnv("HTTP_PORT", "8080")
-	role := getEnv("ROLE", "follower")
-	delay, _ := strconv.Atoi(getEnv("DELAY", "0"))
-	followers := strings.Split(os.Getenv("FOLLOWERS"), ",")
+	// move this to read_config
+	config.init()
+	cluster.init(config.nodes)
 
-	fmt.Printf("%s", role)
-
-	if len(followers) == 0 {
-		panic("provide follower list")
-	}
-
-	fmt.Printf("%+v\n", initAppDb(role, followers, delay))
+	fmt.Printf("%s", config.role)
 
 	http.HandleFunc("/commit", commit_message)
 
@@ -114,5 +105,5 @@ func main() {
 		}
 	})
 
-	http.ListenAndServe(":"+httpPort, nil)
+	http.ListenAndServe(":"+config.httpPort, nil)
 }
