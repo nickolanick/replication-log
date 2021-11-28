@@ -13,8 +13,9 @@ import (
 )
 
 func read_messages(w http.ResponseWriter, req *http.Request) {
-	appDb := getAppDb()
-	fmt.Fprintf(w, "%s\n", appDb.messages)
+	//appDb := getAppDb()
+  fmt.Fprintf(w, "%s\n", repository.GetMessages())
+  //fmt.Fprintf(w, "%s\n", appDb.messages)
 }
 
 func write_message(w http.ResponseWriter, req *http.Request) {
@@ -80,12 +81,13 @@ func commit_message(w http.ResponseWriter, req *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "message: %+v", wr_cons_msg)
-	appDb.write_message(wr_cons_msg.Message)
+	repository.AppendMessage(wr_cons_msg.Message)
 	return
 }
 
 func main() {
 
+  // move this to read_config
 	httpPort := getEnv("HTTP_PORT", "8080")
 	role := getEnv("ROLE", "follower")
 	delay, _ := strconv.Atoi(getEnv("DELAY", "0"))
