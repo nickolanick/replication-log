@@ -8,8 +8,9 @@ import (
 	//	"os"
 	//	"strconv"
 	//	"strings"
-	"sync"
+	//"sync"
 	"time"
+	//"io/ioutil"
 )
 
 func read_messages(w http.ResponseWriter, req *http.Request) {
@@ -45,19 +46,8 @@ func write_message(w http.ResponseWriter, req *http.Request) {
 		// wc should be from field, default field == follower number
 		// while wcmsg atomic counter >= 0 wait
 
-		if wr_cons_msg.WriteConsistency == 0 {
-			wr_cons_msg.WriteConsistency = len(config.nodes)
-		}
-
-		var write_cond sync.WaitGroup
-		write_cond.Add(wr_cons_msg.WriteConsistency)
-
-		wr_cons_msg.WriteCond = &write_cond
-		// wr_cons_msg.WriteCond.Add(wr_cons_msg.WriteConsistency)
-
 		cluster.commitMessages(&wr_cons_msg)
-
-		write_cond.Wait()
+		wr_cons_msg.WriteCond.Wait()
 	}
 
 	fmt.Fprintf(w, "write consistency %i\n", wr_cons_msg.WriteConsistency)
