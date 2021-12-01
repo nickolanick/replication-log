@@ -1,15 +1,15 @@
 package main
 
 import (
-	//  "sync/atomic"
 	"encoding/json"
 	"sync"
 )
 
 type WriteConsistencyMessage struct {
-	Message string
+  Message string `json:"message"`
 	// write consistency
-	WriteConsistency int
+  WriteConsistency int `json:"write_consistency"`
+  TotalOrder int `json:"total_order"`
 	WriteCond        *sync.WaitGroup
 }
 
@@ -17,6 +17,7 @@ type WriteConsistencyMessageJSON struct {
 	Message string `json:"message"`
 	// write consistency
 	WriteConsistency int `json:"write_consistency"`
+  TotalOrder int `json:"total_order,omitempty"`
 }
 
 func (wr_cons_msg *WriteConsistencyMessage) UnmarshalJSON(data []byte) error {
@@ -27,6 +28,7 @@ func (wr_cons_msg *WriteConsistencyMessage) UnmarshalJSON(data []byte) error {
 	}
 
 	wr_cons_msg.Message = res.Message
+  wr_cons_msg.TotalOrder = res.TotalOrder
 
 	// TODO: change to something else or check if default provided
 	// user can potentially pass with 0 to not wait for commit

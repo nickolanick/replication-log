@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	//"fmt"
 	"net/http"
 	"sync"
 )
@@ -41,9 +40,7 @@ func (node *Node) commitMessage() {
 
 	for wcmessage := range node.msg_queue {
 		// send request to commit
-		postBody, _ := json.Marshal(map[string]string{
-			"message": wcmessage.Message,
-		})
+    postBody, _ := json.Marshal(wcmessage)
 
 		for {
 			responseBody := bytes.NewBuffer(postBody)

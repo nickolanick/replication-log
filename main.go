@@ -5,12 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	//	"os"
-	//	"strconv"
-	//	"strings"
-	//"sync"
 	"time"
-	//"io/ioutil"
 )
 
 func read_messages(w http.ResponseWriter, req *http.Request) {
@@ -45,12 +40,14 @@ func write_message(w http.ResponseWriter, req *http.Request) {
 		// send commitMessage
 		// wc should be from field, default field == follower number
 		// while wcmsg atomic counter >= 0 wait
+    wr_cons_msg.TotalOrder = counter.get()
+    fmt.Println(wr_cons_msg.TotalOrder)
 
 		cluster.commitMessages(&wr_cons_msg)
 		wr_cons_msg.WriteCond.Wait()
 	}
 
-	fmt.Fprintf(w, "write consistency %i\n", wr_cons_msg.WriteConsistency)
+	fmt.Fprintf(w, "write consistency %s\n", wr_cons_msg)
 }
 
 func commit_message(w http.ResponseWriter, req *http.Request) {
@@ -70,7 +67,7 @@ func commit_message(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "message: %+v", wr_cons_msg)
 
-	repository.AppendMessage(wr_cons_msg.Message)
+	repository.AppendMessage(wr_cons_msg)
 	return
 }
 
