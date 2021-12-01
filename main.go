@@ -13,6 +13,7 @@ func read_messages(w http.ResponseWriter, req *http.Request) {
 }
 
 func write_message(w http.ResponseWriter, req *http.Request) {
+  // TODO: should return preemptively if n/2 replicas not healthy
 	var wr_cons_msg WriteConsistencyMessage
 
 	if req.Body == nil {
@@ -87,6 +88,7 @@ func main() {
 
 	http.HandleFunc("/commit", commit_message)
 
+  // TODO: add /health (node list with status per node) and /ping endpoint (should return pong)
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		switch req.Method {
 		case http.MethodGet:
