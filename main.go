@@ -40,11 +40,13 @@ func write_message(w http.ResponseWriter, req *http.Request) {
 		// send commitMessage
 		// wc should be from field, default field == follower number
 		// while wcmsg atomic counter >= 0 wait
-    wr_cons_msg.TotalOrder = counter.get()
-    fmt.Println(wr_cons_msg.TotalOrder)
-
-		cluster.commitMessages(&wr_cons_msg)
-		wr_cons_msg.WriteCond.Wait()
+		//wr_cons_msg.TotalOrder = counter.get()
+		_, ok := repository.messages_dedup[wr_cons_msg.Message]
+		if !ok {
+			wr_cons_msg.TotalOrder = counter.get()
+			cluster.commitMessages(&wr_cons_msg)
+			wr_cons_msg.WriteCond.Wait()
+		}
 	}
 
 	fmt.Fprintf(w, "write consistency %s\n", wr_cons_msg)
@@ -53,7 +55,7 @@ func write_message(w http.ResponseWriter, req *http.Request) {
 func commit_message(w http.ResponseWriter, req *http.Request) {
 	time.Sleep(time.Duration(config.delay) * time.Second)
 
-	var wr_cons_msg WriteConsistencyMessage
+	var wr_cons_msg WriteConsistencyMessageJSON
 	if req.Body == nil {
 		http.Error(w, "Please send a request body", 400)
 		return
@@ -67,7 +69,11 @@ func commit_message(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "message: %+v", wr_cons_msg)
 
-	repository.AppendMessage(wr_cons_msg)
+	_, ok := repository.messages_dedup[wr_cons_msg.Message]
+	if !ok {
+		repository.AppendMessage(wr_cons_msg)
+	}
+
 	return
 }
 

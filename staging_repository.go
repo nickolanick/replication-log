@@ -1,19 +1,18 @@
 package main
 
-import (
-)
+import ()
 
 // TODO: consider pointer
-type StagingRepository []WriteConsistencyMessage
+type StagingRepository []WriteConsistencyMessageJSON
 
-func (h StagingRepository) Len() int { return len(h) }
+func (h StagingRepository) Len() int           { return len(h) }
 func (h StagingRepository) Less(i, j int) bool { return h[i].TotalOrder < h[j].TotalOrder }
-func (h StagingRepository) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
+func (h StagingRepository) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
 
 func (h *StagingRepository) Push(x interface{}) {
 	// Push and Pop use pointer receivers because they modify the slice's length,
 	// not just its contents.
-	*h = append(*h, x.(WriteConsistencyMessage))
+	*h = append(*h, x.(WriteConsistencyMessageJSON))
 }
 
 func (h *StagingRepository) Pop() interface{} {

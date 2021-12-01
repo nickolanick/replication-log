@@ -6,10 +6,10 @@ import (
 )
 
 type WriteConsistencyMessage struct {
-  Message string `json:"message"`
+	Message string `json:"message"`
 	// write consistency
-  WriteConsistency int `json:"write_consistency"`
-  TotalOrder int `json:"total_order"`
+	WriteConsistency int `json:"write_consistency"`
+	TotalOrder       int `json:"total_order"`
 	WriteCond        *sync.WaitGroup
 }
 
@@ -17,7 +17,7 @@ type WriteConsistencyMessageJSON struct {
 	Message string `json:"message"`
 	// write consistency
 	WriteConsistency int `json:"write_consistency"`
-  TotalOrder int `json:"total_order,omitempty"`
+	TotalOrder       int `json:"total_order,omitempty"`
 }
 
 func (wr_cons_msg *WriteConsistencyMessage) UnmarshalJSON(data []byte) error {
@@ -28,7 +28,7 @@ func (wr_cons_msg *WriteConsistencyMessage) UnmarshalJSON(data []byte) error {
 	}
 
 	wr_cons_msg.Message = res.Message
-  wr_cons_msg.TotalOrder = res.TotalOrder
+	wr_cons_msg.TotalOrder = res.TotalOrder
 
 	// TODO: change to something else or check if default provided
 	// user can potentially pass with 0 to not wait for commit
@@ -38,10 +38,8 @@ func (wr_cons_msg *WriteConsistencyMessage) UnmarshalJSON(data []byte) error {
 		wr_cons_msg.WriteConsistency = len(config.nodes)
 	}
 
-	var write_cond sync.WaitGroup
-
-	write_cond.Add(wr_cons_msg.WriteConsistency)
-	wr_cons_msg.WriteCond = &write_cond
+	wr_cons_msg.WriteCond = &sync.WaitGroup{}
+	wr_cons_msg.WriteCond.Add(wr_cons_msg.WriteConsistency)
 
 	return nil
 }

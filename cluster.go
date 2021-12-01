@@ -40,7 +40,7 @@ func (node *Node) commitMessage() {
 
 	for wcmessage := range node.msg_queue {
 		// send request to commit
-    postBody, _ := json.Marshal(wcmessage)
+		postBody, _ := json.Marshal(wcmessage)
 
 		for {
 			responseBody := bytes.NewBuffer(postBody)
