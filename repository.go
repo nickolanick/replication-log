@@ -3,10 +3,9 @@ package main
 import (
   "sync"
   "container/heap"
-  "fmt"
+  //"fmt"
 )
 
-// TODO: implement some way to test it
 type Repository struct {
   // total ordering
 	messages []WriteConsistencyMessage
@@ -24,22 +23,30 @@ func (r *Repository) GetMessages() []string {
 }
 
 // TODO: implement RWLock
+// TODO: test - commit message to follower directly (out of range)
 func (r *Repository) AppendMessage(wr_cons_msg WriteConsistencyMessage) {
   // first it should go to staging area
   // and then we try to pop and compare last element we have in current list with total order
   // only workaround is first element
 	heap.Init(&r.staging_repo)
 	heap.Push(&r.staging_repo, wr_cons_msg)
+
+  fmt.Println(wr_cons_msg)
   for {
-    // get last element in heap
-    // if repository last element total order is exactly one less than arrived
-    // than append
-    // otherwise break
+    if len(r.staging_repo) == 0 {
+      break
+    }
+    wr_cons_msg := heap.Pop(&r.staging_repo).(WriteConsistencyMessage)
+    if r.messages[len(r.messages)-1].TotalOrder + 1 == wr_cons_msg.TotalOrder {
+	    r.messages = append(r.messages, wr_cons_msg)
+    } else {
+      heap.Push(&r.staging_repo, wr_cons_msg)
+      break
+    }
   }
 
-  fmt.Println(r.staging_repo)
+  // fmt.Println(r.staging_repo)
   // TODO: try to pop and compare with last element in messages total order
-	r.messages = append(r.messages, wr_cons_msg)
 }
 
-var repository = Repository{[]WriteConsistencyMessage{{"none", 0, -1, &sync.WaitGroup{}}}, StagingRepository{}}
+var repository = Repository{[]WriteConsistencyMessage{{"none", 0, 0, &sync.WaitGroup{}}}, StagingRepository{}}
