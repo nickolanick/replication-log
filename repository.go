@@ -6,6 +6,7 @@ import (
 )
 
 type Repository struct {
+  // total ordering
 	messages []string
 }
 
