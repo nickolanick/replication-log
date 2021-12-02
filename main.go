@@ -13,8 +13,13 @@ func read_messages(w http.ResponseWriter, req *http.Request) {
 }
 
 func write_message(w http.ResponseWriter, req *http.Request) {
-  // TODO: should return preemptively if n/2 replicas not healthy
+	// TODO: should return preemptively if n/2 replicas not healthy
 	var wr_cons_msg WriteConsistencyMessage
+
+	if !cluster.qourum() {
+		http.Error(w, "No qourum, read only mod", 300)
+		return
+	}
 
 	if req.Body == nil {
 		http.Error(w, "Please send a request body", 400)
@@ -78,6 +83,16 @@ func commit_message(w http.ResponseWriter, req *http.Request) {
 	return
 }
 
+func health_check(w http.ResponseWriter, req *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "Health of cluster %s\nQourum : %s", cluster.status(), cluster.qourum())
+}
+
+func ping_check(w http.ResponseWriter, req *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "pong: %s", config.role)
+}
+
 func main() {
 
 	// move this to read_config
@@ -87,8 +102,10 @@ func main() {
 	fmt.Printf("%s", config.role)
 
 	http.HandleFunc("/commit", commit_message)
+	http.HandleFunc("/health", health_check)
+	http.HandleFunc("/ping", ping_check)
 
-  // TODO: add /health (node list with status per node) and /ping endpoint (should return pong)
+	// TODO: add /health (node list with status per node) and /ping endpoint (should return pong)
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		switch req.Method {
 		case http.MethodGet:
