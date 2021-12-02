@@ -68,7 +68,7 @@ type Health struct {
 type Node struct {
 	addr      string
 	msg_queue chan *WriteConsistencyMessage
-	health *Health
+	health    *Health
 }
 
 func (node *Node) healthCheck() {

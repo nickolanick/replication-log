@@ -84,8 +84,17 @@ func commit_message(w http.ResponseWriter, req *http.Request) {
 }
 
 func health_check(w http.ResponseWriter, req *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "Health of cluster %s\nQourum : %s", cluster.status(), cluster.qourum())
+	if config.role == "follower" {
+		_, err := http.Get("http://leader:5000/health")
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+	} else {
+
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "Health of cluster %s\nQourum : %s", cluster.status(), cluster.qourum())
+	}
 }
 
 func ping_check(w http.ResponseWriter, req *http.Request) {
