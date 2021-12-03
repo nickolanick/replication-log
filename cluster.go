@@ -72,11 +72,15 @@ type Node struct {
 }
 
 func (node *Node) healthCheck() {
+	client := http.Client{
+		Timeout: 2 * time.Second,
+	}
 	for {
-		_, err := http.Get(node.addr + "/ping")
+		_, err := client.Get(node.addr + "/ping")
 		if err != nil {
 			node.health.alive = false
 			node.health.status = max(node.health.status-1, 0)
+			fmt.Println("Node: " + node.addr + " is " + health_status[node.health.status])
 		} else {
 			node.health.alive = true
 			node.health.status = min(node.health.status+1, 2)
@@ -95,6 +99,10 @@ func (node *Node) commitMessage() {
 		for {
 			// TODO: use health information to increase retry sleep delay in for loop
 			// kill/pause one of container
+			if node.health.status < 2 {
+				time.Sleep(3 * time.Second)
+			}
+
 			responseBody := bytes.NewBuffer(postBody)
 			_, err := http.Post(node.addr+"/commit", "application/json", responseBody)
 			// TODO: read response body status and retry
