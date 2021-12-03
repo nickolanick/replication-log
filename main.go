@@ -5,12 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	//	"os"
-	//	"strconv"
-	//	"strings"
-	//"sync"
 	"time"
-	//"io/ioutil"
 )
 
 func read_messages(w http.ResponseWriter, req *http.Request) {
@@ -18,7 +13,13 @@ func read_messages(w http.ResponseWriter, req *http.Request) {
 }
 
 func write_message(w http.ResponseWriter, req *http.Request) {
+	// TODO: should return preemptively if n/2 replicas not healthy
 	var wr_cons_msg WriteConsistencyMessage
+
+	if !cluster.qourum() {
+		http.Error(w, "No qourum, read only mod", 300)
+		return
+	}
 
 	if req.Body == nil {
 		http.Error(w, "Please send a request body", 400)
@@ -45,18 +46,19 @@ func write_message(w http.ResponseWriter, req *http.Request) {
 		// send commitMessage
 		// wc should be from field, default field == follower number
 		// while wcmsg atomic counter >= 0 wait
-
+		//wr_cons_msg.TotalOrder = counter.get()
+		wr_cons_msg.TotalOrder = counter.get()
 		cluster.commitMessages(&wr_cons_msg)
 		wr_cons_msg.WriteCond.Wait()
 	}
 
-	fmt.Fprintf(w, "write consistency %i\n", wr_cons_msg.WriteConsistency)
+	fmt.Fprintf(w, "write consistency %s\n", wr_cons_msg)
 }
 
 func commit_message(w http.ResponseWriter, req *http.Request) {
 	time.Sleep(time.Duration(config.delay) * time.Second)
 
-	var wr_cons_msg WriteConsistencyMessage
+	var wr_cons_msg WriteConsistencyMessageJSON
 	if req.Body == nil {
 		http.Error(w, "Please send a request body", 400)
 		return
@@ -69,9 +71,26 @@ func commit_message(w http.ResponseWriter, req *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "message: %+v", wr_cons_msg)
-
-	repository.AppendMessage(wr_cons_msg.Message)
+	repository.AppendMessage(wr_cons_msg)
 	return
+}
+
+func health_check(w http.ResponseWriter, req *http.Request) {
+	if config.role == "follower" {
+		_, err := http.Get("http://leader:5000/health")
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+	} else {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "Health of cluster %s\nQourum : %s", cluster.status(), cluster.qourum())
+	}
+}
+
+func ping_check(w http.ResponseWriter, req *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "pong: %s", config.role)
 }
 
 func main() {
@@ -83,7 +102,10 @@ func main() {
 	fmt.Printf("%s", config.role)
 
 	http.HandleFunc("/commit", commit_message)
+	http.HandleFunc("/health", health_check)
+	http.HandleFunc("/ping", ping_check)
 
+	// TODO: add /health (node list with status per node) and /ping endpoint (should return pong)
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		switch req.Method {
 		case http.MethodGet:
